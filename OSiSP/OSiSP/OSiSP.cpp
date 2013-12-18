@@ -12,19 +12,23 @@ void (*list) (std::wstring dirName);
 
 int loadAllLibrary(std::vector<std::wstring> dllName, std::vector<std::wstring> functionNames);
 void status();
-void exit();
-void copy();
+void exit(PTP_POOL pointerPoll);
+void copy(PTP_CALLBACK_ENVIRON pce);
 void size();
 
 int listFileData(TCHAR* dirName);
 DWORD WINAPI copyFile(PVOID context);
-void copy(TCHAR* nameSource, TCHAR* destinationName);
+void copy(TCHAR* nameSource, TCHAR* destinationName, PTP_CALLBACK_ENVIRON pce);
 
 struct CopyFilesInfo
 {
 	LPCTSTR lpExistingFileName;
 	LPCTSTR lpNewFileName;
 	BOOL bFailIfExists;
+	CopyFilesInfo(LPCTSTR existingFileName, LPCTSTR newFileName, BOOL flag = false)
+		:lpExistingFileName(existingFileName),
+		lpNewFileName(newFileName),
+		bFailIfExists(flag){};
 };
 
 int main(int argc, char** argv)
@@ -57,20 +61,24 @@ int main(int argc, char** argv)
 	PTP_POOL pool = CreateThreadpool(NULL);
 	SetThreadpoolThreadMinimum(pool, min);
 	SetThreadpoolThreadMinimum(pool, max);
+	TP_CALLBACK_ENVIRON callBackEnviron;
+	InitializeThreadpoolEnvironment(&callBackEnviron);
+	SetThreadpoolCallbackPool(&callBackEnviron, pool);
 
 	loadAllLibrary(dllNames, functionNames);
 	int input;
-	std::cout<<"1-List\n";
-	std::cout<<"2-Status\n";
-	std::cout<<"3-Exit\n";
-	std::cout<<"4-Copy\n";
-	std::cout<<"5-Size\n";
-	std::cout<<"Selection: ";
-	std::cin>> input;
 
 	TCHAR dirName[MAX_PATH];
 
 	do{
+		std::cout<<"1-List\n";
+		std::cout<<"2-Status\n";
+		std::cout<<"3-Exit\n";
+		std::cout<<"4-Copy\n";
+		std::cout<<"5-Size\n";
+		std::cout<<"Selection: ";
+		std::cin>> input;
+
 		switch ( input ) 
 		{
 			case 1:
@@ -82,10 +90,10 @@ int main(int argc, char** argv)
 				status();
 				break;
 			case 3:
-				exit();
+				exit(pool);
 				break;
 			case 4:
-				copy();
+				copy(&callBackEnviron);
 				break;
 			case 5:
 				size();
@@ -101,7 +109,7 @@ int main(int argc, char** argv)
 
 }
 
-void copy(TCHAR* nameSource, TCHAR* destinationName)
+void copy(TCHAR* nameSource, TCHAR* destinationName, PTP_CALLBACK_ENVIRON pce)
 {
 	WIN32_FIND_DATA ffd;
 	HANDLE hFind = INVALID_HANDLE_VALUE;
@@ -123,28 +131,27 @@ void copy(TCHAR* nameSource, TCHAR* destinationName)
 			HANDLE handleNextFile = FindFirstFile(nameNext, &nextFfd);
 			do
 			{
-				if (nextFfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+				int lengthShortPartName = GetShortPathName(nextFfd.cFileName, NULL, 0);
+				TCHAR* shortName = new TCHAR[lengthShortPartName];
+				lengthShortPartName = GetShortPathName(nextFfd.cFileName, shortName, lengthShortPartName);
+				if (lengthShortPartName != 0)
 				{
-					int lengthShortPartName = GetShortPathName(nextFfd.cFileName, NULL, 0);
-					TCHAR* shortName = new TCHAR[lengthShortPartName];
-					lengthShortPartName = GetShortPathName(nextFfd.cFileName, shortName, lengthShortPartName);
-					if (lengthShortPartName != 0)
+					LPWSTR nameInsideDir = (LPWSTR)(&std::wstring(destinationName).append(L"\\")[0]);
+					nameInsideDir = lstrcatW(nameInsideDir, (LPWSTR)shortName);
+					if (nextFfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 					{
-						LPWSTR nameInsideDir = (LPWSTR)(&std::wstring(destinationName).append(L"\\")[0]);
-						nameInsideDir = lstrcatW(nameInsideDir, (LPWSTR)shortName);
-						copy(nextFfd.cFileName, nameInsideDir);
+						copy(nextFfd.cFileName, nameInsideDir, pce);
 					}
 					else
 					{
-						wprintf(TEXT(" Ошибка определение короткого имени файла\n"));
+						CopyFilesInfo cfi(nextFfd.cFileName, nameInsideDir);
+						PTP_WORK_CALLBACK workCallBack = (PTP_WORK_CALLBACK)copyFile;
+						PTP_WORK work = CreateThreadpoolWork(workCallBack, (PVOID)(&cfi), pce);
 					}
 				}
 				else
 				{
-					/*filesize.LowPart = ffd.nFileSizeLow;
-					filesize.HighPart = ffd.nFileSizeHigh;
-					wprintf(TEXT("  %s   %ld bytes\n"), ffd.cFileName, filesize.QuadPart);*/
-					//тут надо ставить в очередь функцию копирования конкретных файлов
+					wprintf(TEXT(" Ошибка определение короткого имени файла\n"));
 				}
 			}
 			while (FindNextFile(hFind, &ffd) != 0); 
@@ -156,7 +163,9 @@ void copy(TCHAR* nameSource, TCHAR* destinationName)
 	}
 	else
 	{
-		//тут надо ставить в очередь функцию копирования конкретных файлов
+		CopyFilesInfo cfi(nameSource, destinationName);
+		PTP_WORK_CALLBACK workCallBack = (PTP_WORK_CALLBACK)copyFile;
+		PTP_WORK work = CreateThreadpoolWork(workCallBack, (PVOID)(&cfi), pce);
 	}
 }
 
@@ -252,14 +261,24 @@ void status()
 	std::cout << "2-Status\n";
 }
 
-void exit()
+void exit(PTP_POOL pointerPoll)
 {
 	std::cout << "3-Exit\n";
+	CloseThreadpool(pointerPoll);
 }
 
-void copy()
+void copy(PTP_CALLBACK_ENVIRON pce)
 {
 	std::cout << "4-Copy\n";
+	wprintf(TEXT("Введите файл/папку для копирования "));
+	TCHAR sourceName[MAX_PATH];
+	wscanf_s(L"%s",sourceName, _countof(sourceName));
+
+	wprintf(TEXT("Введите файл/папку - место назначения "));
+	TCHAR destinationName[MAX_PATH];
+	wscanf_s(L"%s",destinationName, _countof(destinationName));
+
+	copy(sourceName, destinationName, pce);
 }
 
 void size()
