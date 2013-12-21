@@ -2,10 +2,7 @@
 //
 #include "stdafx.h"
 #include <iostream>
-#include <tchar.h>
-#include <Windows.h>
 #include <locale.h>
-#include <vector>
 #include <string.h>
 
 /*Указатели на загружаемые функции*/
