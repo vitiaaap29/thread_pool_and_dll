@@ -108,11 +108,14 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="copyFileInfo.h" />
     <ClInclude Include="Pool.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="dispatchCopyByPool.cpp" />
+    <ClCompile Include="getShortName.cpp" />
     <ClCompile Include="OSiSP.cpp" />
     <ClCompile Include="Pool.cpp" />
     <ClCompile Include="stdafx.cpp">

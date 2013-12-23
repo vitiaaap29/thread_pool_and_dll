@@ -13,6 +13,7 @@
 #include <vector>
 #include <map>
 
-
+void copyFile(void* context);
+TCHAR* getShortName(TCHAR* fullName);
 
 // TODO: Установите здесь ссылки на дополнительные заголовки, требующиеся для программы
