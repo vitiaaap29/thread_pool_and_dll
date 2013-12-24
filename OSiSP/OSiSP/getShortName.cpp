@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include <string>
+#include "Prototypes.h"
 
 TCHAR* getShortName(TCHAR* fullName)
 {

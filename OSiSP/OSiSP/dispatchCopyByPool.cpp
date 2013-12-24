@@ -1,7 +1,8 @@
 #include "stdafx.h"
+#include "Prototypes.h"
 #include "copyFileInfo.h"
 
-void dispatchCopyByPool(TCHAR* nameSource, TCHAR* destinationName)
+void dispatchCopyByPool(TCHAR* nameSource, TCHAR* destinationName, PFunction function)
 {
 	WIN32_FIND_DATA ffd;
 	HANDLE hFind = INVALID_HANDLE_VALUE;
@@ -9,7 +10,7 @@ void dispatchCopyByPool(TCHAR* nameSource, TCHAR* destinationName)
 	hFind = FindFirstFile(nameSource, &ffd);
 	if (INVALID_HANDLE_VALUE == hFind) 
 	{
-		std::cout << _T("\r\nОшибка копирования\r\n") << std::endl;
+		wprintf(TEXT("Ошибка копирования\r\n"));
 		return;
 	} 
 
@@ -18,10 +19,9 @@ void dispatchCopyByPool(TCHAR* nameSource, TCHAR* destinationName)
 	hFindDestination = FindFirstFile(nameSource, &ffdDestination);
 	if (INVALID_HANDLE_VALUE == hFindDestination) 
 	{
-		std::cout << _T("Приёмник - не папка\r\n") << std::endl;
+		wprintf(TEXT("Приёмник - не папка\r\n"));
 		return;
 	} 
-
 
 	if (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 	{
@@ -53,13 +53,14 @@ void dispatchCopyByPool(TCHAR* nameSource, TCHAR* destinationName)
 						//можно упростить за счёт рекурсии
 						if (nextFfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 						{
-							dispatchCopyByPool(nextFfd.cFileName, pnameInsideDir);
+							dispatchCopyByPool(nextFfd.cFileName, pnameInsideDir, copyFile);
 						}
 						else
 						{
 							wprintf(TEXT(" Начинаем копирование\n"));
 							TCHAR* pSource = &nextFfd.cFileName[0];
 							CopyFilesInfo *cfi = new CopyFilesInfo(pSource, pnameInsideDir);
+							function(cfi);
 						}
 					}
 					else
@@ -92,6 +93,8 @@ void dispatchCopyByPool(TCHAR* nameSource, TCHAR* destinationName)
 			TCHAR* pname = &nameNewFile[0];
 
 			CopyFilesInfo *cfi = new CopyFilesInfo(nameSource, pname);
+			function(cfi);
 		}
 	}
 }
+

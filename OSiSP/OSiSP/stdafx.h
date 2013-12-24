@@ -12,8 +12,6 @@
 #include <Windows.h>
 #include <vector>
 #include <map>
-
-void copyFile(void* context);
-TCHAR* getShortName(TCHAR* fullName);
+#include "Prototypes.h"
 
 // TODO: Установите здесь ссылки на дополнительные заголовки, требующиеся для программы

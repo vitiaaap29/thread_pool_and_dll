@@ -4,6 +4,7 @@
 #include <iostream>
 #include <locale.h>
 #include <string.h>
+#include "copyFileInfo.h"
 #include "Pool.h"
 
 Pool* pool;
@@ -210,7 +211,7 @@ void getCopyInputData()
 	TCHAR destinationName[MAX_PATH];
 	_tscanf_s(L"%s",destinationName, _countof(destinationName));
 	wprintf(TEXT("подготовка копирования %s в %s\n", sourceName,  destinationName));
-	copy(sourceName, destinationName);
+	dispatchCopyByPool(sourceName, destinationName, copyFile);
 }
 
 void size()
