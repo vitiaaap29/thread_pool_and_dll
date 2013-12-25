@@ -78,14 +78,31 @@ void Pool::addWorkToQueue(WorkItem work)
 
 void Pool::status()
 {
-	map<DWORD, bool>::iterator itFist = killThreads->begin();
-	map<DWORD, bool>::iterator itLast = killThreads->end();
+	map<DWORD, DWORD>::iterator itFist = handlersAndTime->begin();
+	map<DWORD, DWORD>::iterator itLast = handlersAndTime->end();
 	EnterCriticalSection(&this->killCriticalSection);
-	map<DWORD, bool> current = map<DWORD, bool>(itFist, itLast);
+	map<DWORD, DWORD> *current = new map<DWORD, DWORD>(itFist, itLast);
 	LeaveCriticalSection(&this->killCriticalSection);
 
-	map<DWORD, bool>::iterator it = current->begin();
-
+	map<DWORD, DWORD>::iterator it = current->begin();
+	TCHAR* state;
+	int countWork = 0;
+	int countWait = 0;
+	for (; it != current->end(); it++)
+	{
+		if ((*it).second == SIGN_THREAD_NOW_WORK)
+		{
+			state = L" работает   ";
+			countWork++;
+		}
+		else
+		{
+			state = L" ждёт задачу";
+			countWait++;
+		}
+		wprintf(L"id потока = %d  |  состояние = %s\n", (*it).first, state);
+	}
+	wprintf(L"%d потоков работает, %d ожидает\n", countWork, countWait);
 }
 
 
