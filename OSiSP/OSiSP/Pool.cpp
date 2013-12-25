@@ -37,10 +37,10 @@ Pool::Pool(int minCountThreads, int maxCounThreads, int maxTimeLife):
 
 	int nTimerUnitsPerSecond = 10000000;
 	li.QuadPart = -1 * nTimerUnitsPerSecond;
-	int periodMiliseconds = maxTimeLife / 10;
+	int periodMiliseconds = maxTimeLife * 40;
 	SetWaitableTimer(killThreadTimer, &li, periodMiliseconds, NULL, NULL, FALSE);
 
-	killKiller = false;
+	signKillKiller = 0;
 	CreateThread(NULL, 0, this->killer, this, 0, NULL); 
 }
 
@@ -104,26 +104,34 @@ HANDLE Pool::addOrdinaryThread(bool multiThreadEnviroment)
 	return temp;
 }
 
-HANDLE Pool::getCurrentThreadHandle()
+void Pool::killAll()
 {
-	HANDLE result;
-	HANDLE prom = GetCurrentProcess();
-	HANDLE thre = GetCurrentThread();
-	DuplicateHandle(prom, thre,
-		prom, &result, 0,
-		FALSE, DUPLICATE_SAME_ACCESS);
-
-	DWORD id = GetCurrentThreadId();
-	result = OpenThread(PROCESS_ALL_ACCESS, false, GetCurrentThreadId());
-	return result;
+	map<DWORD, bool> *temp = new map<DWORD, bool>();
+	map<DWORD, bool>::iterator it = killThreads->begin();
+	for (; it != killThreads->end(); it++)
+	{
+		DWORD currentId = (*it).first;
+		temp->insert(std::pair<DWORD,bool>(currentId, true));
+	}
+	delete killThreads;
+	EnterCriticalSection(&killCriticalSection);
+	killThreads = temp;	
+	LeaveCriticalSection(&killCriticalSection);
+	InterlockedExchangeAdd(&signKillKiller, 1);
+	Sleep(maxTimeLife);
+	if (queueWorks->size() != 0)
+	{
+		wprintf(TEXT("Осталось %d необработанных запросов\n"), queueWorks->size());
+	}
 }
 
 DWORD WINAPI Pool::killer(PVOID context)
 {
 	int timeWithoutWork = 0;
 	Pool *pool = (Pool*)context;
-	while(*pool->killKiller == false)
+	while(InterlockedExchangeAdd(&pool->signKillKiller, 0) == 0)
 	{
+		//printf("Killer %d wait, me said.. i want kill=)\n", GetCurrentThreadId());
 		WaitForSingleObject(pool->killThreadTimer, INFINITE);
 		map<DWORD, DWORD>::iterator it = pool->handlersAndTime->begin();
 		map<DWORD, bool>::iterator itKill = pool->killThreads->begin();
@@ -162,10 +170,10 @@ DWORD WINAPI Pool::threadFunction(void* context)
 			break;
 		}
 		LeaveCriticalSection(&pool->killCriticalSection);
-
+		printf("Work thread: %d wait on semaphore\n", currentThreadId);
 		//ждём пока нет новой задачи
 		WaitForSingleObject(pool->semaphoreFreeThread, INFINITE);
-
+		printf("Work thread: %d now was work\n", currentThreadId);
 		//отмечаем, что поток начнёт работать
 		EnterCriticalSection(&pool->timeLifeCriticalSection);
 		pool->handlersAndTime->at(currentThreadId) = SIGN_THREAD_NOW_WORK;

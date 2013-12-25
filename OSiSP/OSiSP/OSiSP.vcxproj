@@ -117,6 +117,7 @@
   <ItemGroup>
     <ClCompile Include="dispatchCopyByPool.cpp" />
     <ClCompile Include="getShortName.cpp" />
+    <ClCompile Include="normalizeSlash.cpp" />
     <ClCompile Include="OSiSP.cpp" />
     <ClCompile Include="Pool.cpp" />
     <ClCompile Include="stdafx.cpp">

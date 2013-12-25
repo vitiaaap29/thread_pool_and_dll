@@ -1,8 +1,9 @@
 #include "stdafx.h"
 #include "Prototypes.h"
 #include "copyFileInfo.h"
+#include "Pool.h"
 
-void dispatchCopyByPool(TCHAR* nameSource, TCHAR* destinationName, PFunction function)
+void dispatchCopyByPool(TCHAR* nameSource, TCHAR* destinationName, PFunction function, Pool* pool)
 {
 	WIN32_FIND_DATA ffd;
 	HANDLE hFind = INVALID_HANDLE_VALUE;
@@ -16,7 +17,7 @@ void dispatchCopyByPool(TCHAR* nameSource, TCHAR* destinationName, PFunction fun
 
 	WIN32_FIND_DATA ffdDestination;
 	HANDLE hFindDestination = INVALID_HANDLE_VALUE;
-	hFindDestination = FindFirstFile(nameSource, &ffdDestination);
+	hFindDestination = FindFirstFile(destinationName, &ffdDestination);
 	if (INVALID_HANDLE_VALUE == hFindDestination) 
 	{
 		wprintf(TEXT("Приёмник - не папка\r\n"));
@@ -30,49 +31,63 @@ void dispatchCopyByPool(TCHAR* nameSource, TCHAR* destinationName, PFunction fun
 		TCHAR* shortDirName = getShortName(nameSource);
 		if (shortDirName != NULL)
 		{
-			LPWSTR nameNewDir = (LPWSTR)(&std::wstring(destinationName).append(L"\\")[0]);
-			nameNewDir = lstrcatW(nameNewDir, (LPWSTR)shortDirName);
-			destinationName = nameNewDir;
+			//if (CreateDirectory(destinationName, NULL);
+			std::wstring *nd = new std::wstring(destinationName);
+			nd->append(L"\\");
+			nd->append(shortDirName);
+			destinationName = (TCHAR*)&(nd->c_str()[0]);
+			wprintf(L"Имя нового каталога %s\n", destinationName );
 
 			if (CreateDirectory(destinationName, NULL))
 			{
-				wprintf(TEXT("Создаём подкаталог %s в %s"),nameNewDir, destinationName );
+				wprintf(L"Создаём подкаталог %s в %s",shortDirName, destinationName );
 
 				//проходим по директории и копируем файлы в директорию-приёмник
 				WIN32_FIND_DATA nextFfd;
-				LPCWSTR nameNext = (LPCWSTR)(&std::wstring(nameSource).append(L"\\*")[0]);
+				std::wstring* nextFile = new std::wstring(nameSource);
+				nextFile->append(L"\\*");
+				LPCWSTR nameNext = (LPCWSTR)&(nextFile->c_str()[0]);
 				HANDLE handleNextFile = FindFirstFile(nameNext, &nextFfd);
-				do{
-					TCHAR* shortName = getShortName(nextFfd.cFileName);
-					if (shortName != NULL)
-					{
-						std::wstring nameInsideDir = std::wstring(destinationName).append(L"\\");
-						nameInsideDir += shortName;
-						TCHAR* pnameInsideDir = &nameInsideDir[0];
 
-						//можно упростить за счёт рекурсии
-						if (nextFfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+				if (lstrcmpW(L".", nextFfd.cFileName) != 0 && lstrcmpW(L"..", nextFfd.cFileName) != 0)
+				{
+					do{
+						TCHAR* shortName = getShortName(nextFfd.cFileName);
+						if (shortName != NULL)
 						{
-							dispatchCopyByPool(nextFfd.cFileName, pnameInsideDir, copyFile);
+							std::wstring *nameInsideDir = new std::wstring(destinationName);
+							nameInsideDir->append(L"\\");
+							nameInsideDir->append(shortName);
+							TCHAR* pnameInsideDir = (TCHAR*)&(nameInsideDir->c_str()[0]);
+
+							//можно упростить за счёт рекурсии
+							if (nextFfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+							{
+								dispatchCopyByPool(nextFfd.cFileName, pnameInsideDir, copyFile, pool);
+							}
+							else
+							{
+								wprintf(TEXT(" Начинаем копирование\n"));
+								TCHAR* pSource = &nextFfd.cFileName[0];
+								CopyFilesInfo *cfi = new CopyFilesInfo(pSource, pnameInsideDir);
+								Pool::WorkItem work(function, cfi);
+								pool->addWorkToQueue(work);
+							}
 						}
 						else
 						{
-							wprintf(TEXT(" Начинаем копирование\n"));
-							TCHAR* pSource = &nextFfd.cFileName[0];
-							CopyFilesInfo *cfi = new CopyFilesInfo(pSource, pnameInsideDir);
-							function(cfi);
+							wprintf(TEXT(" Ошибка определение короткого имени файла\n"));
 						}
-					}
-					else
-					{
-						wprintf(TEXT(" Ошибка определение короткого имени файла\n"));
-					}
+					}while (FindNextFile(hFind, &ffd) != 0);
 				}
-				while (FindNextFile(hFind, &ffd) != 0);
 			}
 			else
 			{
-				wprintf(TEXT(" Ошибка создания новой директории в директории-приёмнике\n"));
+				DWORD codeError = GetLastError();
+				if (codeError == 183)
+				{
+					wprintf(L" Ошибка: %s файл уже существует\n", destinationName);
+				}
 				return;
 			}
 		}
@@ -88,12 +103,14 @@ void dispatchCopyByPool(TCHAR* nameSource, TCHAR* destinationName, PFunction fun
 		if (shortName != NULL)
 		{
 			wprintf(TEXT(" Начинаем копирование\n"));
-			std::wstring nameNewFile = std::wstring(destinationName).append(L"\\");
-			nameNewFile += std::wstring(shortName);
-			TCHAR* pname = &nameNewFile[0];
+			std::wstring *nameNewFile = new std::wstring(destinationName);
+			nameNewFile->append(L"\\");
+			nameNewFile->append(shortName);
+			TCHAR* pname = (TCHAR*)&(nameNewFile->c_str()[0]);
 
 			CopyFilesInfo *cfi = new CopyFilesInfo(nameSource, pname);
-			function(cfi);
+			Pool::WorkItem work(function, cfi);
+			pool->addWorkToQueue(work);
 		}
 	}
 }

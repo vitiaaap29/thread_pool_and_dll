@@ -16,7 +16,7 @@ public:
 	~Pool(void);
 
 	void addWorkToQueue(WorkItem work);
-	void killAllThread();
+	void killAll();
 private:
 	static const int MAX_COUNT_WORKS = 0xFFFFFFF;
 	static const int COUNT_SPIN_CRITICAL_SECTION = 4000;
@@ -27,7 +27,7 @@ private:
 	int maxTimeLife;
 
 	HANDLE killThreadTimer;
-	bool* killKiller;
+	DWORD signKillKiller;
 
 	std::vector<HANDLE> *handlers;
 
@@ -42,10 +42,6 @@ private:
 	HANDLE semaphoreFreeThread;
 
 	HANDLE addOrdinaryThread(bool multiThreadEnviroment);
-
-	void killAll();
-
-	static HANDLE getCurrentThreadHandle();
 
 	static DWORD WINAPI killer(PVOID context);
 	

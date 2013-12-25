@@ -70,8 +70,10 @@ int main(int argc, char** argv)
 		std::cout<<"4-Copy\n";
 		std::cout<<"5-Size\n";
 		std::cout<<"Selection: ";
+		fflush(stdout);
+		fflush(stdin);
 		std::cin>> input;
-		system("cls");
+		//system("cls");
 		switch ( input ) 
 		{
 			case 1:
@@ -105,8 +107,9 @@ int main(int argc, char** argv)
 void copyFile(void* context)
 {
 	CopyFilesInfo* cfi = (CopyFilesInfo*)context;
-	wprintf(TEXT("Непосредственное копирование из %s в %s\n", cfi->existingFileName,  cfi->newFileName));
+	wprintf(L"Непосредственное копирование из %s в %s\n", cfi->existingFileName,  cfi->newFileName);
 	int result = CopyFile(cfi->existingFileName, cfi->newFileName, cfi->bFailIfExists);
+	printf("result = %d", result);
 	delete cfi;
 }
 
@@ -198,6 +201,7 @@ void status()
 void exit()
 {
 	std::cout << "3-Exit\n";
+	pool->killAll();
 }
 
 void getCopyInputData()
@@ -210,8 +214,8 @@ void getCopyInputData()
 	wprintf(TEXT("Введите файл/папку - место назначения "));
 	TCHAR destinationName[MAX_PATH];
 	_tscanf_s(L"%s",destinationName, _countof(destinationName));
-	wprintf(TEXT("подготовка копирования %s в %s\n", sourceName,  destinationName));
-	dispatchCopyByPool(sourceName, destinationName, copyFile);
+	wprintf(L"подготовка копирования %s в %s\n", sourceName,  destinationName);
+	dispatchCopyByPool(sourceName, destinationName, copyFile, pool);
 }
 
 void size()
