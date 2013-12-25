@@ -17,6 +17,7 @@ public:
 
 	void addWorkToQueue(WorkItem work);
 	void killAll();
+	void status();
 private:
 	static const int MAX_COUNT_WORKS = 0xFFFFFFF;
 	static const int COUNT_SPIN_CRITICAL_SECTION = 4000;

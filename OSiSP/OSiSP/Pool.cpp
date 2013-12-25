@@ -76,6 +76,18 @@ void Pool::addWorkToQueue(WorkItem work)
 	ReleaseSemaphore(semaphoreFreeThread, 1, &previosValue); 
 }
 
+void Pool::status()
+{
+	map<DWORD, bool>::iterator itFist = killThreads->begin();
+	map<DWORD, bool>::iterator itLast = killThreads->end();
+	EnterCriticalSection(&this->killCriticalSection);
+	map<DWORD, bool> current = map<DWORD, bool>(itFist, itLast);
+	LeaveCriticalSection(&this->killCriticalSection);
+
+	map<DWORD, bool>::iterator it = current->begin();
+
+}
+
 
 HANDLE Pool::addOrdinaryThread(bool multiThreadEnviroment)
 {

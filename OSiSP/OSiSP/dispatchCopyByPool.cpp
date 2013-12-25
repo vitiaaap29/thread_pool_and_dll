@@ -49,37 +49,46 @@ void dispatchCopyByPool(TCHAR* nameSource, TCHAR* destinationName, PFunction fun
 				LPCWSTR nameNext = (LPCWSTR)&(nextFile->c_str()[0]);
 				HANDLE handleNextFile = FindFirstFile(nameNext, &nextFfd);
 
-				if (lstrcmpW(L".", nextFfd.cFileName) != 0 && lstrcmpW(L"..", nextFfd.cFileName) != 0)
-				{
-					do{
-						TCHAR* shortName = getShortName(nextFfd.cFileName);
+				do{
+					if (lstrcmpW(L".", nextFfd.cFileName) != 0 && lstrcmpW(L"..", nextFfd.cFileName) != 0)
+					{
+						TCHAR* shortName = nextFfd.cFileName;
 						if (shortName != NULL)
 						{
-							std::wstring *nameInsideDir = new std::wstring(destinationName);
-							nameInsideDir->append(L"\\");
-							nameInsideDir->append(shortName);
-							TCHAR* pnameInsideDir = (TCHAR*)&(nameInsideDir->c_str()[0]);
-
 							//можно упростить за счёт рекурсии
 							if (nextFfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 							{
-								dispatchCopyByPool(nextFfd.cFileName, pnameInsideDir, copyFile, pool);
+								std::wstring* sourceFile = new std::wstring(nameSource);
+								sourceFile->append(L"\\");
+								sourceFile->append(nextFfd.cFileName);
+								TCHAR* sourceName = (TCHAR*)&(sourceFile->c_str()[0]);
+
+								dispatchCopyByPool(sourceName, destinationName, copyFile, pool);
 							}
 							else
 							{
-								wprintf(TEXT(" Начинаем копирование\n"));
-								TCHAR* pSource = &nextFfd.cFileName[0];
-								CopyFilesInfo *cfi = new CopyFilesInfo(pSource, pnameInsideDir);
+								wprintf(L" Начинаем копирование\n");
+								std::wstring* sourceFile = new std::wstring(nameSource);
+								sourceFile->append(L"\\");
+								sourceFile->append(nextFfd.cFileName);
+
+								std::wstring *nameInsideDir = new std::wstring(destinationName);
+								nameInsideDir->append(L"\\");
+								nameInsideDir->append(shortName);
+								TCHAR* pnameInsideDir = (TCHAR*)&(nameInsideDir->c_str()[0]);
+
+								TCHAR* sourceName = (TCHAR*)&(sourceFile->c_str()[0]);
+								CopyFilesInfo *cfi = new CopyFilesInfo(sourceName, pnameInsideDir);
 								Pool::WorkItem work(function, cfi);
 								pool->addWorkToQueue(work);
 							}
 						}
 						else
 						{
-							wprintf(TEXT(" Ошибка определение короткого имени файла\n"));
+							wprintf(L" Ошибка определение короткого имени файла\n");
 						}
-					}while (FindNextFile(hFind, &ffd) != 0);
-				}
+					}
+				}while (FindNextFile(handleNextFile, &nextFfd) != 0);
 			}
 			else
 			{
