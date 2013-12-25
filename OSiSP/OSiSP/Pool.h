@@ -26,17 +26,24 @@ private:
 	int maxCountThreads;
 	int maxTimeLife;
 
+	HANDLE killThreadTimer;
+	bool* killKiller;
+
+	std::vector<HANDLE> *handlers;
+
 	CRITICAL_SECTION killCriticalSection;
-	std::map<HANDLE, bool>* killThreads;
+	std::map<DWORD, bool>* killThreads;
 
 	CRITICAL_SECTION timeLifeCriticalSection;
-	std::map<HANDLE, DWORD> *handlersAndTime;
+	std::map<DWORD, DWORD> *handlersAndTime;
 
 	std::vector<WorkItem> *queueWorks;
 	CRITICAL_SECTION worksCriticalSection;
 	HANDLE semaphoreFreeThread;
 
 	HANDLE addOrdinaryThread(bool multiThreadEnviroment);
+
+	void killAll();
 
 	static HANDLE getCurrentThreadHandle();
 

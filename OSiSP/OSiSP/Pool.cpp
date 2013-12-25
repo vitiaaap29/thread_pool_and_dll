@@ -8,35 +8,50 @@ Pool::Pool(int minCountThreads, int maxCounThreads, int maxTimeLife):
 	maxCountThreads(maxCounThreads),
 	maxTimeLife(maxTimeLife)
 {
-	handlersAndTime = new map<HANDLE, DWORD>();
-	killThreads = new map<HANDLE, bool>();
+	handlersAndTime = new map<DWORD, DWORD>();
+	killThreads = new map<DWORD, bool>();
 	queueWorks = new vector<WorkItem>();
 	semaphoreFreeThread = CreateSemaphore(NULL, 0, MAX_COUNT_WORKS, NULL);
 	InitializeCriticalSectionAndSpinCount(&worksCriticalSection, COUNT_SPIN_CRITICAL_SECTION);
 	InitializeCriticalSectionAndSpinCount(&timeLifeCriticalSection, COUNT_SPIN_CRITICAL_SECTION);
 	InitializeCriticalSectionAndSpinCount(&killCriticalSection, COUNT_SPIN_CRITICAL_SECTION);
 
+	handlers = new vector<HANDLE>();
 	for (int i = 0; i < minCountThreads; i++)
 	{
-		HANDLE isCreate = addOrdinaryThread(false);
-		if (isCreate == NULL)
+		HANDLE currentHandler = addOrdinaryThread(false);
+		if (currentHandler == NULL)
 		{
 			wprintf(TEXT("яра€ ошибка не можем создать поток в констукторе\r\n"));
 		}
 	}
 
-	//запускаем поток убийцу
-	//PTHREAD_START_ROUTINE threadKiller = (PTHREAD_START_ROUTINE)this->killer;
+	vector<HANDLE>::iterator it = handlers->begin();
+	for (; it != handlers->end(); it++)
+	{
+		ResumeThread(*it);
+	}
+
+	LARGE_INTEGER li;
+	killThreadTimer = CreateWaitableTimer(NULL, FALSE, NULL);
+
+	int nTimerUnitsPerSecond = 10000000;
+	li.QuadPart = -1 * nTimerUnitsPerSecond;
+	int periodMiliseconds = maxTimeLife / 10;
+	SetWaitableTimer(killThreadTimer, &li, periodMiliseconds, NULL, NULL, FALSE);
+
+	killKiller = false;
 	CreateThread(NULL, 0, this->killer, this, 0, NULL); 
 }
 
 Pool::~Pool(void)
 {
-	map<HANDLE, DWORD>::iterator it = handlersAndTime->begin();
-	for (; it != handlersAndTime->end(); it++)
+	vector<HANDLE>::iterator it = handlers->begin();
+	for (; it != handlers->end(); it++)
 	{
-		CloseHandle((*it).first);
+		CloseHandle(*it);
 	}
+	delete handlers;
 	delete handlersAndTime;
 	delete queueWorks;
 	CloseHandle(semaphoreFreeThread);
@@ -50,7 +65,11 @@ void Pool::addWorkToQueue(WorkItem work)
 	bool needAddThread = handlersAndTime->size() < queueWorks->size() && handlersAndTime->size() < maxCountThreads;
 	if (needAddThread)
 	{
-		addOrdinaryThread(true);
+		HANDLE newThread = addOrdinaryThread(true);
+		if (newThread != NULL)
+		{
+			ResumeThread(newThread);
+		}
 	}
 	queueWorks->push_back(work);
 	LONG previosValue;
@@ -60,21 +79,26 @@ void Pool::addWorkToQueue(WorkItem work)
 
 HANDLE Pool::addOrdinaryThread(bool multiThreadEnviroment)
 {
-	HANDLE temp = CreateThread(NULL, 0, threadFunction, this, 0, NULL);
-	if (multiThreadEnviroment)
+	HANDLE temp = CreateThread(NULL, 0, threadFunction, this, CREATE_SUSPENDED, NULL);
+	if (temp != NULL)
 	{
-		EnterCriticalSection(&timeLifeCriticalSection);
-		handlersAndTime->insert(std::pair<HANDLE, DWORD>(temp, 0));
-		LeaveCriticalSection(&timeLifeCriticalSection);
+		DWORD threadId = GetThreadId(temp);
+		if (multiThreadEnviroment)
+		{
+			EnterCriticalSection(&timeLifeCriticalSection);
+			handlersAndTime->insert(std::pair<DWORD, DWORD>(threadId, 0));
+			LeaveCriticalSection(&timeLifeCriticalSection);
 
-		EnterCriticalSection(&killCriticalSection);
-		killThreads->insert(std::pair<HANDLE,bool>(temp,false));
-		LeaveCriticalSection(&killCriticalSection);
-	}
-	else
-	{
-		handlersAndTime->insert(std::pair<HANDLE, DWORD>(temp, 0));
-		killThreads->insert(std::pair<HANDLE,bool>(temp,false));
+			EnterCriticalSection(&killCriticalSection);
+			killThreads->insert(std::pair<DWORD,bool>(threadId,false));
+			LeaveCriticalSection(&killCriticalSection);
+		}
+		else
+		{
+			handlersAndTime->insert(std::pair<DWORD, DWORD>(threadId, 0));
+			killThreads->insert(std::pair<DWORD,bool>(threadId,false));
+		}
+		handlers->push_back(temp);
 	}
 
 	return temp;
@@ -98,18 +122,22 @@ DWORD WINAPI Pool::killer(PVOID context)
 {
 	int timeWithoutWork = 0;
 	Pool *pool = (Pool*)context;
-	map<HANDLE, DWORD>::iterator it = pool->handlersAndTime->begin();
-	map<HANDLE, bool>::iterator itKill = pool->killThreads->begin();
-	for (;it != pool->handlersAndTime->end(); it++, itKill++)
+	while(*pool->killKiller == false)
 	{
-		if( (*it).second != SIGN_THREAD_NOW_WORK)
+		WaitForSingleObject(pool->killThreadTimer, INFINITE);
+		map<DWORD, DWORD>::iterator it = pool->handlersAndTime->begin();
+		map<DWORD, bool>::iterator itKill = pool->killThreads->begin();
+		for (;it != pool->handlersAndTime->end(); it++, itKill++)
 		{
-			timeWithoutWork = GetTickCount() - (*it).second;
-			if (timeWithoutWork >= pool->maxTimeLife)
+			if( (*it).second != SIGN_THREAD_NOW_WORK)
 			{
-				EnterCriticalSection(&pool->killCriticalSection);
-				(*itKill).second = true;
-				LeaveCriticalSection(&pool->killCriticalSection);
+				timeWithoutWork = GetTickCount() - (*it).second;
+				if (timeWithoutWork >= pool->maxTimeLife)
+				{
+					EnterCriticalSection(&pool->killCriticalSection);
+					(*itKill).second = true;
+					LeaveCriticalSection(&pool->killCriticalSection);
+				}
 			}
 		}
 	}
@@ -118,9 +146,9 @@ DWORD WINAPI Pool::killer(PVOID context)
 
 DWORD WINAPI Pool::threadFunction(void* context)
 {
-	HANDLE currentThreadHandle = getCurrentThreadHandle();
+	DWORD currentThreadId = GetCurrentThreadId();
 	//работаем пока хотим, что поток жил или не убиваем его
-	printf("Thread: %d\n", currentThreadHandle);
+	printf("Thread: %d\n", currentThreadId);
 	fflush(stdin);
 	Pool *pool = (Pool*)context;
 
@@ -128,7 +156,7 @@ DWORD WINAPI Pool::threadFunction(void* context)
 	{
 		//выходим из потока, если ему повелел killer
 		EnterCriticalSection(&pool->killCriticalSection);
-		if (pool->killThreads->at(currentThreadHandle) == true)
+		if (pool->killThreads->at(currentThreadId) == true)
 		{
 			LeaveCriticalSection(&pool->killCriticalSection);
 			break;
@@ -140,7 +168,7 @@ DWORD WINAPI Pool::threadFunction(void* context)
 
 		//отмечаем, что поток начнЄт работать
 		EnterCriticalSection(&pool->timeLifeCriticalSection);
-		pool->handlersAndTime->at(currentThreadHandle) = SIGN_THREAD_NOW_WORK;
+		pool->handlersAndTime->at(currentThreadId) = SIGN_THREAD_NOW_WORK;
 		LeaveCriticalSection(&pool->timeLifeCriticalSection);
 
 		//атомарно получаем работу и удал€ем еЄ из очереди
@@ -156,7 +184,7 @@ DWORD WINAPI Pool::threadFunction(void* context)
 		//врем€ когда поток перестал работать
 		EnterCriticalSection(&pool->timeLifeCriticalSection);
 		DWORD currentTime = GetTickCount();
-		pool->handlersAndTime->at(currentThreadHandle) = currentTime;
+		pool->handlersAndTime->at(currentThreadId) = currentTime;
 		LeaveCriticalSection(&pool->timeLifeCriticalSection);
 	}
 
