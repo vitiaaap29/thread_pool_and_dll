@@ -1,4 +1,4 @@
-// OSiSP.cpp: определяет точку входа для консольного приложения.
+// OSiSP.cpp: Г®ГЇГ°ГҐГ¤ГҐГ«ГїГҐГІ ГІГ®Г·ГЄГі ГўГµГ®Г¤Г  Г¤Г«Гї ГЄГ®Г­Г±Г®Г«ГјГ­Г®ГЈГ® ГЇГ°ГЁГ«Г®Г¦ГҐГ­ГЁГї.
 //
 #include "stdafx.h"
 #include <iostream>
@@ -9,7 +9,7 @@
 
 Pool* pool;
 
-/*Указатели на загружаемые функции*/
+/*Г“ГЄГ Г§Г ГІГҐГ«ГЁ Г­Г  Г§Г ГЈГ°ГіГ¦Г ГҐГ¬Г»ГҐ ГґГіГ­ГЄГ¶ГЁГЁ*/
 void (*list) (std::wstring dirName);
 
 int loadAllLibrary(std::vector<std::wstring> dllName, std::vector<std::wstring> functionNames);
@@ -29,7 +29,7 @@ int main(int argc, char** argv)
 
 	if (argc < 4)
 	{
-		wprintf(TEXT("Не правильное число агрументов. Идём лесом.\n"));
+		wprintf(TEXT("ГЌГҐ ГЇГ°Г ГўГЁГ«ГјГ­Г®ГҐ Г·ГЁГ±Г«Г® Г ГЈГ°ГіГ¬ГҐГ­ГІГ®Гў. Г€Г¤ВёГ¬ Г«ГҐГ±Г®Г¬.\n"));
 		system("pause");
 		min = 2;
 		max = 10;
@@ -44,7 +44,7 @@ int main(int argc, char** argv)
 
 	if (min < 1 || max > 500 || timeLive < 0)
 	{
-		wprintf(TEXT("Аргументы имеют недопустимое значение. Идём лесом.\n"));
+		wprintf(TEXT("ГЂГ°ГЈГіГ¬ГҐГ­ГІГ» ГЁГ¬ГҐГѕГІ Г­ГҐГ¤Г®ГЇГіГ±ГІГЁГ¬Г®ГҐ Г§Г­Г Г·ГҐГ­ГЁГҐ. Г€Г¤ВёГ¬ Г«ГҐГ±Г®Г¬.\n"));
 		system("pause");
 		return -1;
 	}
@@ -104,15 +104,6 @@ int main(int argc, char** argv)
 
 }
 
-void copyFile(void* context)
-{
-	CopyFilesInfo* cfi = (CopyFilesInfo*)context;
-	wprintf(L"Непосредственное копирование из %s в %s\n", cfi->existingFileName,  cfi->newFileName);
-	int result = CopyFile(cfi->existingFileName, cfi->newFileName, cfi->bFailIfExists);
-	printf("result = %d", result);
-	delete cfi;
-}
-
 int listFileData(TCHAR* dirName)
 {
 	WIN32_FIND_DATA ffd;
@@ -159,31 +150,31 @@ int loadAllLibrary(std::vector<std::wstring> dllNames, std::vector<std::wstring>
 	for (int i = 0; i < countLibrary; i++)
 	{
 		HMODULE hDll;
-		// Указатель на функцию
+		// Г“ГЄГ Г§Г ГІГҐГ«Гј Г­Г  ГґГіГ­ГЄГ¶ГЁГѕ
 		//void (*adress) (void);
 
 		LPCWSTR name = const_cast<LPCWSTR>(&dllNames[i][0]);
-		// Загружаем динамически подключаемую библиотеку
+		// Г‡Г ГЈГ°ГіГ¦Г ГҐГ¬ Г¤ГЁГ­Г Г¬ГЁГ·ГҐГ±ГЄГЁ ГЇГ®Г¤ГЄГ«ГѕГ·Г ГҐГ¬ГіГѕ ГЎГЁГЎГ«ГЁГ®ГІГҐГЄГі
 		hDll = LoadLibrary(name);
 		if(!hDll)
 		{
-			std::cout << _T("Динамическая библиотека не загружена") << std::endl;
+			std::cout << _T("Г„ГЁГ­Г Г¬ГЁГ·ГҐГ±ГЄГ Гї ГЎГЁГЎГ«ГЁГ®ГІГҐГЄГ  Г­ГҐ Г§Г ГЈГ°ГіГ¦ГҐГ­Г ") << std::endl;
 			return GetLastError();
 		}
-		// Настраиваем адрес функции
+		// ГЌГ Г±ГІГ°Г ГЁГўГ ГҐГ¬ Г Г¤Г°ГҐГ± ГґГіГ­ГЄГ¶ГЁГЁ
 		adress[i] = (void (*)(void))GetProcAddress(hDll, (LPCSTR)(&functionNames.at(i)[0]));
 		if(!adress[i])
 		{
-			std::cout << _T("Ошибка получения адреса функции") << std::endl;
+			std::cout << _T("ГЋГёГЁГЎГЄГ  ГЇГ®Г«ГіГ·ГҐГ­ГЁГї Г Г¤Г°ГҐГ±Г  ГґГіГ­ГЄГ¶ГЁГЁ") << std::endl;
 			return GetLastError();
 		}
-		// Вызываем функцию из библиотеки
+		// Г‚Г»Г§Г»ГўГ ГҐГ¬ ГґГіГ­ГЄГ¶ГЁГѕ ГЁГ§ ГЎГЁГЎГ«ГЁГ®ГІГҐГЄГЁ
 		//adress();
 
-		// Отключаем библиотеку
+		// ГЋГІГЄГ«ГѕГ·Г ГҐГ¬ ГЎГЁГЎГ«ГЁГ®ГІГҐГЄГі
 		if(!FreeLibrary(hDll))
 		{
-			std::cout << _T("Ошибка выгрузки библиотеки из памяти") << std::endl;
+			std::cout << _T("ГЋГёГЁГЎГЄГ  ГўГ»ГЈГ°ГіГ§ГЄГЁ ГЎГЁГЎГ«ГЁГ®ГІГҐГЄГЁ ГЁГ§ ГЇГ Г¬ГїГІГЁ") << std::endl;
 			return GetLastError();
 		}
 
@@ -207,18 +198,23 @@ void exit()
 void getCopyInputData()
 {
 	std::cout << "4-Copy\n";
-	wprintf(TEXT("Введите файл/папку для копирования "));
+	wprintf(TEXT("Г‚ГўГҐГ¤ГЁГІГҐ ГґГ Г©Г«/ГЇГ ГЇГЄГі Г¤Г«Гї ГЄГ®ГЇГЁГ°Г®ГўГ Г­ГЁГї "));
 	TCHAR sourceName[MAX_PATH];
 	_tscanf_s(L"%s",sourceName, MAX_PATH/*_countof(sourceName)*/);
 
-	wprintf(TEXT("Введите файл/папку - место назначения "));
+	wprintf(TEXT("Г‚ГўГҐГ¤ГЁГІГҐ ГґГ Г©Г«/ГЇГ ГЇГЄГі - Г¬ГҐГ±ГІГ® Г­Г Г§Г­Г Г·ГҐГ­ГЁГї "));
 	TCHAR destinationName[MAX_PATH];
 	_tscanf_s(L"%s",destinationName, _countof(destinationName));
-	wprintf(L"подготовка копирования %s в %s\n", sourceName,  destinationName);
+	wprintf(L"ГЇГ®Г¤ГЈГ®ГІГ®ГўГЄГ  ГЄГ®ГЇГЁГ°Г®ГўГ Г­ГЁГї %s Гў %s\n", sourceName,  destinationName);
 	dispatchCopyByPool(sourceName, destinationName, copyFile, pool);
 }
 
 void size()
 {
 	std::cout << "5-Size\n";
+	wprintf(TEXT("Р’РІРµРґРёС‚Рµ РёРјСЏ С„Р°Р№Р»Р°/РґРёСЂРµРєС‚РѕСЂРёРё "));
+	TCHAR name[MAX_PATH];
+	_tscanf_s(L"%s",name, MAX_PATH);
+	float* size = 0;
+	dispatchSizeByPool(name, size, sizeFile, pool);
 }
