@@ -1,6 +1,4 @@
-// OSiSP.cpp: îïðåäåëÿåò òî÷êó âõîäà äëÿ êîíñîëüíîãî ïðèëîæåíèÿ.
-//
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include <iostream>
 #include <locale.h>
 #include <string.h>
@@ -8,8 +6,8 @@
 #include "Pool.h"
 
 Pool* pool;
+volatile float sizeForAPC;
 
-/*Óêàçàòåëè íà çàãðóæàåìûå ôóíêöèè*/
 void (*list) (std::wstring dirName);
 
 int loadAllLibrary(std::vector<std::wstring> dllName, std::vector<std::wstring> functionNames);
@@ -29,7 +27,7 @@ int main(int argc, char** argv)
 
 	if (argc < 4)
 	{
-		wprintf(TEXT("Íå ïðàâèëüíîå ÷èñëî àãðóìåíòîâ. Èä¸ì ëåñîì.\n"));
+		wprintf(TEXT("Недостаточно параметров, присвоено значение по умолчанию\n"));
 		system("pause");
 		min = 2;
 		max = 10;
@@ -44,7 +42,7 @@ int main(int argc, char** argv)
 
 	if (min < 1 || max > 500 || timeLive < 0)
 	{
-		wprintf(TEXT("Àðãóìåíòû èìåþò íåäîïóñòèìîå çíà÷åíèå. Èä¸ì ëåñîì.\n"));
+		wprintf(TEXT("Некорректные данные.\n"));
 		system("pause");
 		return -1;
 	}
@@ -150,28 +148,24 @@ int loadAllLibrary(std::vector<std::wstring> dllNames, std::vector<std::wstring>
 	for (int i = 0; i < countLibrary; i++)
 	{
 		HMODULE hDll;
-		// Óêàçàòåëü íà ôóíêöèþ
 		//void (*adress) (void);
 
 		LPCWSTR name = const_cast<LPCWSTR>(&dllNames[i][0]);
-		// Çàãðóæàåì äèíàìè÷åñêè ïîäêëþ÷àåìóþ áèáëèîòåêó
+
 		hDll = LoadLibrary(name);
 		if(!hDll)
 		{
 			std::cout << _T("Äèíàìè÷åñêàÿ áèáëèîòåêà íå çàãðóæåíà") << std::endl;
 			return GetLastError();
 		}
-		// Íàñòðàèâàåì àäðåñ ôóíêöèè
+
 		adress[i] = (void (*)(void))GetProcAddress(hDll, (LPCSTR)(&functionNames.at(i)[0]));
 		if(!adress[i])
 		{
 			std::cout << _T("Îøèáêà ïîëó÷åíèÿ àäðåñà ôóíêöèè") << std::endl;
 			return GetLastError();
 		}
-		// Âûçûâàåì ôóíêöèþ èç áèáëèîòåêè
-		//adress();
 
-		// Îòêëþ÷àåì áèáëèîòåêó
 		if(!FreeLibrary(hDll))
 		{
 			std::cout << _T("Îøèáêà âûãðóçêè áèáëèîòåêè èç ïàìÿòè") << std::endl;
@@ -198,14 +192,14 @@ void exit()
 void getCopyInputData()
 {
 	std::cout << "4-Copy\n";
-	wprintf(TEXT("Ââåäèòå ôàéë/ïàïêó äëÿ êîïèðîâàíèÿ "));
+	wprintf(TEXT("Введите файл/папку для копирования "));
 	TCHAR sourceName[MAX_PATH];
-	_tscanf_s(L"%s",sourceName, MAX_PATH/*_countof(sourceName)*/);
+	_tscanf_s(L"%s",sourceName, MAX_PATH);
 
-	wprintf(TEXT("Ââåäèòå ôàéë/ïàïêó - ìåñòî íàçíà÷åíèÿ "));
+	wprintf(TEXT("Ввведит папку-приёмник "));
 	TCHAR destinationName[MAX_PATH];
 	_tscanf_s(L"%s",destinationName, _countof(destinationName));
-	wprintf(L"ïîäãîòîâêà êîïèðîâàíèÿ %s â %s\n", sourceName,  destinationName);
+	wprintf(L"Начинаем копирование %s â %s\n", sourceName,  destinationName);
 	dispatchCopyByPool(sourceName, destinationName, copyFile, pool);
 }
 
@@ -215,6 +209,8 @@ void size()
 	wprintf(TEXT("Введите имя файла/директории "));
 	TCHAR name[MAX_PATH];
 	_tscanf_s(L"%s",name, MAX_PATH);
-	float* size = 0;
-	dispatchSizeByPool(name, size, sizeFile, pool);
+	sizeForAPC = 0;
+	dispatchSizeByPool(name, (float*)&sizeForAPC, sizeFile, pool);
+	Sleep(4000);
+	wprintf(L"Размер %s = %ld байт\n", name, (long long)sizeForAPC);
 }

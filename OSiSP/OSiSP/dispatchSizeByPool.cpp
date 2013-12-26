@@ -3,6 +3,8 @@
 #include "sizeFileInfo.h"
 #include "Pool.h"
 
+CRITICAL_SECTION cs;
+
 void dispatchSizeByPool(TCHAR* name, float* sum, PFunction function, Pool* pool)
 {
 	WIN32_FIND_DATA ffd;
@@ -29,14 +31,16 @@ void dispatchSizeByPool(TCHAR* name, float* sum, PFunction function, Pool* pool)
 			}
 			else
 			{
-				SizeFileInfo *sfi = new SizeFileInfo(ffd, sum);
-				Pool::WorkItem *work = new Pool::WorkItem(function, (void*)sfi);
+				SizeFileInfo *sfi = new SizeFileInfo(ffd, sum, &cs);
+				Pool::WorkItem work(function, (void*)sfi);
+				pool->addWorkToQueue(work);
 			}
 		}while (FindNextFile(handleNextFile, &nextFfd) != 0);
 	}
 	else
 	{
-		SizeFileInfo *sfi = new SizeFileInfo(ffd, sum);
-		Pool::WorkItem* work = new Pool::WorkItem(function, (void*)sfi);
+		SizeFileInfo *sfi = new SizeFileInfo(ffd, sum, &cs);
+		Pool::WorkItem work(function, (void*)sfi);
+		pool->addWorkToQueue(work);
 	}
 }
